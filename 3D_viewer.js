@@ -1054,6 +1054,8 @@ function startExplosionAndAdjustCamera(skip = false) {
               // Ensure the material is a MeshStandardMaterial or MeshPhysicalMaterial
               child.material = materialPBR;  // Set the texture map
               child.material.needsUpdate = true;  // Flag for update
+              child.castShadow = true;
+              child.receiveShadow = true;
           }
       });
   }
