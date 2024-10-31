@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function init3DViewer() {
     scene = new THREE.Scene();
 
-    camera = new THREE.PerspectiveCamera(50, resizable.clientWidth / resizable.clientHeight, 0.01, 10000);
+    camera = new THREE.PerspectiveCamera(50, resizable.clientWidth / resizable.clientHeight, 0.01, 50000);
     camera.position.set(0, 0, 15);
     camera.near = 0.01;
     camera.lookAt(new THREE.Vector3(0, 0, 0));
