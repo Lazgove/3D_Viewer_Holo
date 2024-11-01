@@ -1,3 +1,4 @@
+<script>
 document.addEventListener('DOMContentLoaded', () => {
 
   // ######            ######
@@ -50,10 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
       gltf: new THREE.GLTFLoader(),
       //step: new THREE.BrepLoader()
     };
-    
-  //const exporter = new THREE.GLTFExporter();
 
-  
   let rotationSpeed = 0;
   let explosionDist = 0; 
   let isResizing = false;
@@ -66,11 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let occtInitialized = false;
   let occt;
   const distanceScaleFactor = 3;
-  const smoothFactor = 0.05;  // Adjust this value between 0 and 1 for smoothness (higher = faster)
+  const smoothFactor = 0.05;
 
-  // Add resize event listener
   window.addEventListener('resize', onResize);
-  // Define a temporary vector to store the target camera position
+
   const targetPosition = new THREE.Vector3();
 
   const textureMap = new Map();
@@ -86,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
   function init3DViewer() {
+
     scene = new THREE.Scene();
 
     camera = new THREE.PerspectiveCamera(50, resizable.clientWidth / resizable.clientHeight, 100, 50000);
@@ -93,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     camera.near = 0.01;
     camera.lookAt(new THREE.Vector3(0, 0, 0));
     camera.updateProjectionMatrix();
+    scene.add(camera);
     //const axesHelper = new THREE.AxesHelper(5);
     //scene.add(axesHelper);
 
@@ -102,7 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     viewerElement.appendChild(renderer.domElement);
 
-    //textureLoader = new THREE.TextureLoader();
     controls = new THREE.OrbitControls( camera, renderer.domElement );
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
@@ -132,16 +130,23 @@ document.addEventListener('DOMContentLoaded', () => {
     nullObject.name = "nullObject";
     scene.add(nullObject);
 
-    const geometry = new THREE.PlaneGeometry(10000, 10000);
-    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 1 });
-    const plane = new THREE.Mesh(geometry, material);
-    plane.position.z = -50;
-    plane.receiveShadow = true;
-    plane.name = "planeBG";
-    plane.material.opacity = 0;
-    scene.add(plane);
+    // Create a shadow-receiving plane (floor) as a child of the camera
+    const planeGeometry = new THREE.PlaneGeometry(50, 50); // Plane based on object size
+    //const planeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 1 });
+    const planeMaterial = new THREE.MeshStandardMaterial({ 
+      side: THREE.DoubleSide,
+      color: 0xffffff,
+      opacity: 1,
+    });
+    console.log('ihjuihuihuihuihiu');
+    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    // plane.rotation.x = -Math.PI / 2;
+    // plane.position.y = 0;
+    plane.receiveShadow = true; // Enable shadow receiving
+    plane.name = 'planeBG';
+    camera.add(plane); // Add the plane as a child of the camera
 
-    add3PointLighting();
+    //add3PointLighting();
 
     const maskGeometry = new THREE.PlaneGeometry(2, 2);
     const maskMaterial = new THREE.ShaderMaterial({
@@ -237,17 +242,18 @@ document.addEventListener('DOMContentLoaded', () => {
           transparent: true,
       });
 
-      const maskQuadSquare = new THREE.Mesh(maskGeometrySquare, maskMaterialSquare);
-      maskQuadSquare.name = "maskQuadSquare";
-      maskQuadSquare.visible = false;
-      scene.add(maskQuadSquare);
+    const maskQuadSquare = new THREE.Mesh(maskGeometrySquare, maskMaterialSquare);
+    maskQuadSquare.name = "maskQuadSquare";
+    maskQuadSquare.visible = false;
+    scene.add(maskQuadSquare);
 
     setInterval(startExplosionAndAdjustCamera, 100);
-    //loadFBX('https://s3-webflow-bucket.s3.eu-west-3.amazonaws.com/Scene_Objects/S_Curve.fbx');
-    //loadHDRI(hdriFiles[0]);
     easeInRotation();
     animate();
     onResize();
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    scene.add(ambientLight);
+    controls.addEventListener("change", updatePlanePosition);
 
   }
 
@@ -286,6 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
       this.originalPositions = [];
       this.maxDistance = 0;
       this.model.castShadow = true;
+      this.model.receiveShadow = true;
 
       if (this.model.rotation.x === -Math.PI / 2) {
         this.pointingAxis = 'z';
@@ -299,10 +306,32 @@ document.addEventListener('DOMContentLoaded', () => {
       this.centerBbox = this.boundingBox.getCenter(new THREE.Vector3());
       this.size = this.boundingBox.getSize(new THREE.Vector3());
       this.model.position.sub(this.centerBbox);
-      //this.applyMaterialToModel();
+
       this.createBoundingBoxMesh();
       this.computeChildrenBoundingBox();
       this.createBoundingBoxesAndAnnotations();
+      this.adjustCameraClippingAndPlaneSize();
+    }
+
+    updateCameraClippingPlanes() {
+      // Calculate the bounding box of the object
+      //const boundingBox = new THREE.Box3().setFromObject(this.model);
+      //const size = boundingBox.getSize(new THREE.Vector3());
+      const maxDimension = Math.max(this.size.x, this.size.y, this.size.z);
+    
+      // Set near and far clipping planes
+      camera.near = maxDimension * 0.01; // 10% of max dimension for near plane
+      camera.far = maxDimension * 100; // 10x max dimension for far plane
+      camera.updateProjectionMatrix(); // Update the camera's projection matrix
+    }
+
+    adjustCameraClippingAndPlaneSize() {
+      const maxDimension = Math.max(this.size.x, this.size.y, this.size.z);
+      camera.near = maxDimension * 0.01;
+      camera.far = maxDimension * 1000;
+      const planeBG = camera.getObjectByName('planeBG');
+      planeBG.scale.set(maxDimension * 20, maxDimension * 20, 1); // Adjust the multiplier as needed
+
     }
 
     createBoundingBoxMesh() {
@@ -433,12 +462,21 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('Center:', this.center);
       console.log('Size:', this.size);
     }
-
   }
 
   // ######                 ######
   // ######    Scene        ######
   // ######                 ######
+
+  function updatePlanePosition() {
+    if (currentModel) {
+      const distanceToCamera = camera.position.length();
+      const boundingBox = new THREE.Box3().setFromObject(currentModel.model);
+      const maxSize = boundingBox.getSize(new THREE.Vector3()).length();
+      camera.getObjectByName('planeBG').position.set(0, 0, -(distanceToCamera + maxSize/2)); // Offset based on object size
+      camera.getObjectByName('planeBG').lookAt(camera.position); // Make the plane face the camera
+    }
+  }
 
   repereCheckbox.addEventListener('change', function () {
       console.log('hello');
@@ -464,14 +502,19 @@ document.addEventListener('DOMContentLoaded', () => {
 }
 
   blackModeCheckbox.addEventListener('change', function () {
-    const plane = scene.getObjectByName('planeBG');
+    const plane = camera.getObjectByName('planeBG');
     const overlay = scene.getObjectByName("maskQuad");
     const overlaySquare = scene.getObjectByName("maskQuadSquare");
+    //positionPlaneBehindModel();
     if (this.checked) {
+      renderer.setClearColor(0x000000, 1);
       plane.material.opacity = 0;
       overlay.visible = true;
-      overlaySquare.visible = true;
+      if (repereCheckbox.checked) {
+        overlaySquare.visible = true;
+      }
     } else {
+      renderer.setClearColor(0xffffff, 1);
       plane.material.opacity = 1;
       overlay.visible = false;
       overlaySquare.visible = false;
@@ -479,68 +522,48 @@ document.addEventListener('DOMContentLoaded', () => {
     plane.material.needsUpdate = true;
 });
 
-  function getHypotenuse(a, b) {
-    return Math.sqrt(a * a + b * b);
-  }
-
-  function updatePlanePosition() {
-    plane = scene.getObjectByName("planeBG");
-    plane.position.copy(camera.position);
-    const forward = new THREE.Vector3(0, 0, -1);
-    forward.applyQuaternion(camera.quaternion);
-    plane.position.add(forward.multiplyScalar(getHypotenuse(camera.position.x, camera.position.z) + currentModel.size.z*2));
-    plane.lookAt(camera.position);
-  }
-
-
   // #### LIGHTING ####
 
-  function updateChildVisibility() {
-    scene.getObjectByName('planeBG').traverse(function (child) {
-        if (child.name != 'planeBG') {
-          child.visible = true;
-        }
-    });
+  // Function to dynamically set light positions and shadow camera based on object size
+  function setLightPositions() {
+    // Calculate the bounding box of the object
+    const boundingBox = new THREE.Box3().setFromObject(currentModel.model);
+    const size = boundingBox.getSize(new THREE.Vector3());
+    const maxDimension = Math.max(size.x, size.y, size.z);
+    const lightDistance = maxDimension * 3; // Adjust light distance based on object size
+
+    // Clear any existing lights before re-adding (useful if lights are added multiple times)
+    camera.getObjectByName('planeBG').clear();
+
+    // Key light
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1);
+    keyLight.position.set(lightDistance, lightDistance / 2, lightDistance * 2);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+
+    // Adjust shadow camera for larger objects
+    keyLight.shadow.camera.left = -maxDimension*20;
+    keyLight.shadow.camera.right = maxDimension*20;
+    keyLight.shadow.camera.top = maxDimension*20;
+    keyLight.shadow.camera.bottom = -maxDimension*20;
+    keyLight.shadow.camera.near = 0.01;
+    keyLight.shadow.camera.far = lightDistance * 20;
+    camera.getObjectByName('planeBG').add(keyLight);
+
+    // Fill light (weaker and from a different angle)
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    fillLight.position.set(-lightDistance, lightDistance / 2, lightDistance);
+    fillLight.castShadow = true;
+    camera.getObjectByName('planeBG').add(fillLight);
+
+    // Back light (to add separation from the background)
+    const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    backLight.position.set(0, lightDistance / 2, -lightDistance);
+    backLight.castShadow = true;
+    camera.getObjectByName('planeBG').add(backLight);
   }
 
-  function createLight(x, y, z, intensity, name, hasShadow=false) {
-    const light = new THREE.DirectionalLight(0xffffff, intensity);
-    light.name = name;
-    light.position.set(x, y, z);
-    light.castShadow = hasShadow;
-    light.shadow.mapSize.width = 2048*2;
-    light.shadow.mapSize.height = 2048*2;
-    light.shadow.bias = -0.005;
-    light.shadow.camera.near = 0.1;
-    light.shadow.camera.far = 1000;
-    light.shadow.camera.left = -50;
-    light.shadow.camera.right = 50;
-    light.shadow.camera.top = 50;
-    light.shadow.camera.bottom = -50;
-    const center = new THREE.Vector3(0, 0, 0);
-    light.lookAt(center);
-    scene.getObjectByName("planeBG").add(light);
-  }
-  
-  function updateLightPositions() {
-
-    const offsetX = currentModel.size.x;
-    const offsetY = currentModel.size.y;
-    const offsetZ = currentModel.size.z;
-    scene.getObjectByName("planeBG").getObjectByName("MainLight").position.set(offsetX*1, offsetY*1, offsetZ*4);
-    scene.getObjectByName("planeBG").getObjectByName("FillLight").position.set(-offsetX*5, offsetY*2, offsetZ*5);
-    scene.getObjectByName("planeBG").getObjectByName("BackLight").position.set(offsetX*0, offsetY*5, -offsetZ*5);
-    scene.getObjectByName("planeBG").getObjectByName("BottomLight").position.set(offsetX*0, -offsetY*5, -offsetZ*0);
-  }
-
-  function add3PointLighting() {
-    createLight(0, 0, 0, 1, "MainLight", true);
-    createLight(0, 0, 0, 0.5, "FillLight");
-    createLight(0, 0, 0, 0.3, "BackLight");
-    createLight(0, 0, 0, 0.4, "BottomLight");
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
-    scene.add(ambientLight);
-  }
 
   // #### RESET CAMERA VIEW ####
   document.getElementById('recenter-button').addEventListener('click', () => {
@@ -587,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Rotate the model if rotationSpeed is greater than 0
     if (currentModel) {
-      updatePlanePosition();
+      //updatePlanePosition();
       updateCameraAndControls();
       //currentModel.updateBoundingBoxRotation();
       if (currentModel.pointingAxis === 'y') {
@@ -865,8 +888,6 @@ function startExplosionAndAdjustCamera(skip = false) {
   // #### MULTIPLE FORMATS ####
   function handleModelLoading(file, mtlFile = null, animationsFiles = null, texturesFiles = null) {
     const extension = file.split('.').pop();
-    console.log('texturefiles');
-    console.log(texturesFiles);
     loadAndGroupModels(file, extension, texturesFiles);
     }
 
@@ -1025,7 +1046,7 @@ function startExplosionAndAdjustCamera(skip = false) {
       // Update focus, lighting, and bounding box based on the new model
       currentModel = modelWrapper;
       focusOnObject();
-      updateLightPositions();
+      setLightPositions();
       updateMinDistanceBasedOnBoundingBox();
       createDynamicDropdown(currentModel.model);
   }
@@ -1239,4 +1260,4 @@ function startExplosionAndAdjustCamera(skip = false) {
   init3DViewer();
   });
 
-
+</script>
