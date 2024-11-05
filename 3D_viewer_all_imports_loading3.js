@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stl: new THREE.STLLoader(),
       ply: new THREE.PLYLoader(),
       gltf: new THREE.GLTFLoader(),
+      glb: new THREE.GLTFLoader(),
       //step: new THREE.BrepLoader()
     };
 
@@ -909,45 +910,43 @@ function startExplosionAndAdjustCamera(skip = false) {
   }
   
   async function LoadStep(fileUrl) {
-    await initializeOcct();
-    const startTime = performance.now();
+    const breakPointInit = breakpoints/4;
 
+    await initializeOcct();
+    updateProgressTo(breakPointInit);
+    
     const response = await fetch(fileUrl);
+    updateProgressTo(breakPointInit*2);
     const buffer = await response.arrayBuffer();
     const fileBuffer = new Uint8Array(buffer);
+    updateProgressTo(breakPointInit*3);
     const result = occt.ReadStepFile(fileBuffer);
     const targetObject = new THREE.Object3D();
-    const instancedMeshes = {};
-    for (let i = 0; i < result.meshes.length; i++) {
-        const resultMesh = result.meshes[i];
-        const positionArray = new Float32Array(resultMesh.attributes.position.array);
-        const indexArray = new Uint16Array(resultMesh.index.array);
-
-        const geometryKey = `${positionArray.toString()}_${indexArray.toString()}`;
-        
-        if (!instancedMeshes[geometryKey]) {
-            const geometry = new THREE.BufferGeometry();
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positionArray, 3));
-            if (resultMesh.attributes.normal) {
-                const normalArray = new Float32Array(resultMesh.attributes.normal.array);
-                geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normalArray, 3));
-            }
-            const color = resultMesh.color
-                ? new THREE.Color(resultMesh.color[0], resultMesh.color[1], resultMesh.color[2])
-                : new THREE.Color(0xcccccc);
-            const material = new THREE.MeshPhongMaterial({ color });
-            instancedMeshes[geometryKey] = new THREE.InstancedMesh(geometry, material, 0);
-            targetObject.add(instancedMeshes[geometryKey]);
-        }
-        instancedMeshes[geometryKey].count += 1;
+  
+    for (const resultMesh of result.meshes) {
+      const geometry = new THREE.BufferGeometry();
+      const positionArray = new Float32Array(resultMesh.attributes.position.array);
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positionArray, 3));
+  
+      if (resultMesh.attributes.normal) {
+        const normalArray = new Float32Array(resultMesh.attributes.normal.array);
+        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normalArray, 3));
+      }
+  
+      const indexArray = new Uint16Array(resultMesh.index.array);
+      geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
+  
+      const color = resultMesh.color 
+        ? new THREE.Color(resultMesh.color[0], resultMesh.color[1], resultMesh.color[2])
+        : 0xcccccc;
+      
+      const material = new THREE.MeshPhongMaterial({ color });
+      const mesh = new THREE.Mesh(geometry, material);
+      targetObject.add(mesh);
     }
-
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    console.log(`LoadStep executed in ${duration.toFixed(2)} milliseconds`);
-
+    updateProgressTo(breakPointInit*4);
     return targetObject;
-}
+  }
 
   // Enhanced loadAndGroupModels function to handle texture assignment
   async function loadAndGroupModels(file, fileType, textureUrlsS3) {
@@ -987,13 +986,12 @@ function startExplosionAndAdjustCamera(skip = false) {
 
           try {
               const model = await loadModel(url, fileType);
-              updateProgressTo(breakpoints);
               breakpoints += initialBreakpoint;
               // Only convert to glTF if not already in glTF/glb format
             //   const finalModel = (fileType === 'gltf' || fileType === 'glb')
             //       ? model  // If glTF, use the model directly
             //       : await convertToGLTF(model, fileType, url);  // Otherwise, convert to glTF
-            const finalModel = model;
+              const finalModel = model;
               // Apply textures or base material to the model
               applyMaterialToMeshModel(finalModel, textureUrlsList);
 
