@@ -1,3 +1,5 @@
+
+<script src="https://cdn.jsdelivr.net/gh/Lazgove/3D_Viewer_Holo/3D_viewer.js"></script>
 document.addEventListener('DOMContentLoaded', () => {
 
   // ######            ######
@@ -207,12 +209,9 @@ document.addEventListener('DOMContentLoaded', () => {
       scene.add(maskQuadSquare);
 
     setInterval(startExplosionAndAdjustCamera, 100);
-    //loadFBX('https://s3-webflow-bucket.s3.eu-west-3.amazonaws.com/Scene_Objects/S_Curve.fbx');
-    //loadHDRI(hdriFiles[0]);
     easeInRotation();
     animate();
     onResize();
-
   }
 
   // Handle window resize to keep the canvas responsive

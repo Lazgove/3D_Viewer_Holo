@@ -1,4 +1,23 @@
 <script>
+{/* async function fetchCMSData() {
+    const response = await fetch(`https://api.webflow.com/collections/66df39d5db1e442f284dbc93/items`, {
+        headers: {
+            'Authorization': `Bearer 2e77d90febe1e2efcfb0c7baa0b5c645441cfed7fdb09eef7975011ec512dc94`,
+            'Accept-Version': '1.0.0'
+        }
+    });
+    const data = await response.json();
+    // Use this data to update your select elements
+    updateSelectOptions(data.items); // Custom function to update your select
+}
+document.addEventListener('DOMContentLoaded', function() {
+    if (localStorage.getItem('dataUpdated')) {
+        // Fetch and update your select data here
+        fetchCMSData();
+        localStorage.removeItem('dataUpdated'); // Clear the flag
+    }
+}); */}
+
 document.addEventListener('DOMContentLoaded', () => {
 
   // ######            ######
@@ -138,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
       color: 0xffffff,
       opacity: 1,
     });
-    console.log('ihjuihuihuihuihiu');
+
     const plane = new THREE.Mesh(planeGeometry, planeMaterial);
     // plane.rotation.x = -Math.PI / 2;
     // plane.position.y = 0;
@@ -251,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     easeInRotation();
     animate();
     onResize();
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
     controls.addEventListener("change", updatePlanePosition);
 
@@ -311,7 +330,59 @@ document.addEventListener('DOMContentLoaded', () => {
       this.computeChildrenBoundingBox();
       this.createBoundingBoxesAndAnnotations();
       this.adjustCameraClippingAndPlaneSize();
+      this.setLightPositions();
     }
+
+    setLightPositions() {
+      // Calculate the bounding box of the object
+      const boundingBox = new THREE.Box3().setFromObject(this.model);
+      const size = boundingBox.getSize(new THREE.Vector3());
+      const maxDimension = Math.max(size.x, size.y, size.z);
+      const lightDistance = maxDimension; // Adjust light distance based on object size
+      const keyLight = new THREE.DirectionalLight(0xffffff, 1);
+  
+      // Clear any existing lights before re-adding (useful if lights are added multiple times)
+      camera.getObjectByName('planeBG').clear();
+
+      const desiredPosition = new THREE.Vector3(lightDistance, lightDistance / 2, lightDistance * 2);
+      // Calculate the camera's position and orientation in the world
+      const worldPosition = new THREE.Vector3();
+      camera.getWorldPosition(worldPosition);
+      
+      // Calculate the new position of the light relative to the camera
+      const lightOffset = desiredPosition.clone().sub(worldPosition);
+      
+      // Set the light's position relative to the camera
+      keyLight.position.copy(lightOffset);
+
+      // Key light
+      //keyLight.position.set(lightDistance, lightDistance / 2, lightDistance * 2);
+      keyLight.castShadow = true;
+      keyLight.shadow.mapSize.width = 2048*4;
+      keyLight.shadow.mapSize.height = 2048*4;
+      keyLight.shadow.bias = -0.01;
+      // Adjust shadow camera for larger objects
+      keyLight.shadow.camera.left = -maxDimension*20;
+      keyLight.shadow.camera.right = maxDimension*20;
+      keyLight.shadow.camera.top = maxDimension*20;
+      keyLight.shadow.camera.bottom = -maxDimension*20;
+      keyLight.shadow.camera.near = 0.01;
+      keyLight.shadow.camera.far = lightDistance * 20;
+      camera.getObjectByName('planeBG').add(keyLight);
+  
+      // Fill light (weaker and from a different angle)
+      const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+      fillLight.position.set(-lightDistance, lightDistance / 2, lightDistance);
+      fillLight.castShadow = false;
+      camera.getObjectByName('planeBG').add(fillLight);
+  
+      // Back light (to add separation from the background)
+      const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
+      backLight.position.set(0, lightDistance / 2, -lightDistance);
+      backLight.castShadow = false;
+      camera.getObjectByName('planeBG').add(backLight);
+    }
+  
 
     updateCameraClippingPlanes() {
       // Calculate the bounding box of the object
@@ -441,14 +512,14 @@ document.addEventListener('DOMContentLoaded', () => {
       let index = 0;
       this.model.traverse((child) => {
           if (child.isMesh && child.geometry) {
-            console.log(`hehe type: ${child.type} name: ${child.name}`);
+            //console.log(`hehe type: ${child.type} name: ${child.name}`);
 
             const boundingBoxChild = new THREE.Box3().setFromObject(child, true);
             const massCenterChild = boundingBoxChild.getCenter(new THREE.Vector3());
-            console.log(`masscenter: ${massCenterChild.x}, ${massCenterChild.y}, ${massCenterChild.z}`);
+            //console.log(`masscenter: ${massCenterChild.x}, ${massCenterChild.y}, ${massCenterChild.z}`);
             //console.log(`centerBox: ${currentCenterBbox.x}, ${currentCenterBbox.y}, ${currentCenterBbox.z}`);
             const direction = new THREE.Vector3().subVectors(massCenterChild.clone(), currentCenterBbox).normalize();
-            console.log(`direction: ${direction.x}, ${direction.y}, ${direction.z}`);
+            //console.log(`direction: ${direction.x}, ${direction.y}, ${direction.z}`);
             this.directionVectors.push(direction.clone());
             this.originalPositions.push(child.position.clone());
             index ++;
@@ -508,14 +579,14 @@ document.addEventListener('DOMContentLoaded', () => {
     //positionPlaneBehindModel();
     if (this.checked) {
       renderer.setClearColor(0x000000, 1);
-      plane.material.opacity = 0;
+      camera.getObjectByName('planeBG').material.opacity = 0;
       overlay.visible = true;
       if (repereCheckbox.checked) {
         overlaySquare.visible = true;
       }
     } else {
       renderer.setClearColor(0xffffff, 1);
-      plane.material.opacity = 1;
+      camera.getObjectByName('planeBG').material.opacity = 1;
       overlay.visible = false;
       overlaySquare.visible = false;
     }
@@ -525,45 +596,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // #### LIGHTING ####
 
   // Function to dynamically set light positions and shadow camera based on object size
-  function setLightPositions() {
-    // Calculate the bounding box of the object
-    const boundingBox = new THREE.Box3().setFromObject(currentModel.model);
-    const size = boundingBox.getSize(new THREE.Vector3());
-    const maxDimension = Math.max(size.x, size.y, size.z);
-    const lightDistance = maxDimension * 3; // Adjust light distance based on object size
-
-    // Clear any existing lights before re-adding (useful if lights are added multiple times)
-    camera.getObjectByName('planeBG').clear();
-
-    // Key light
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1);
-    keyLight.position.set(lightDistance, lightDistance / 2, lightDistance * 2);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 2048;
-    keyLight.shadow.mapSize.height = 2048;
-
-    // Adjust shadow camera for larger objects
-    keyLight.shadow.camera.left = -maxDimension*20;
-    keyLight.shadow.camera.right = maxDimension*20;
-    keyLight.shadow.camera.top = maxDimension*20;
-    keyLight.shadow.camera.bottom = -maxDimension*20;
-    keyLight.shadow.camera.near = 0.01;
-    keyLight.shadow.camera.far = lightDistance * 20;
-    camera.getObjectByName('planeBG').add(keyLight);
-
-    // Fill light (weaker and from a different angle)
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    fillLight.position.set(-lightDistance, lightDistance / 2, lightDistance);
-    fillLight.castShadow = true;
-    camera.getObjectByName('planeBG').add(fillLight);
-
-    // Back light (to add separation from the background)
-    const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    backLight.position.set(0, lightDistance / 2, -lightDistance);
-    backLight.castShadow = true;
-    camera.getObjectByName('planeBG').add(backLight);
-  }
-
 
   // #### RESET CAMERA VIEW ####
   document.getElementById('recenter-button').addEventListener('click', () => {
@@ -806,10 +838,10 @@ function startExplosionAndAdjustCamera(skip = false) {
           // Parse texture files and store them in the texturePaths
           if (texturesFiles && texturesFiles.size === 0) {
             console.log('texturesFiles file is empty, loading object without texture');
-            handleModelLoading(modelFile, mtlFile, animationsFiles, texturesFiles);; // Passing null to indicate no texture
+            loadModel(modelFile, mtlFile, animationsFiles, texturesFiles);; // Passing null to indicate no texture
           } else {
             //parseTextureFiles(texturesFiles);
-            handleModelLoading(modelFile, mtlFile, animationsFiles, texturesFiles); // Load with MTL if available and valid
+            loadModel(modelFile, mtlFile, animationsFiles, texturesFiles); // Load with MTL if available and valid
           }
       }
 
@@ -854,18 +886,15 @@ function startExplosionAndAdjustCamera(skip = false) {
     animationSelect.addEventListener('change', () => {
         // Remove existing model
         if (currentModel) {
-          //alert('remove model animation change');
           scene.getObjectByName('nullObject').remove(currentModel.model);
           currentModel = null;
         }
         const selectedAnimation = animationSelect.value;
         if (animationSelect.selectedIndex === 0)
         {
-          //alert('handle modelling');
-          handleModelLoading(file, mtlFile, animationsFiles, texturesFiles);
+          loadModel(file, mtlFile, animationsFiles, texturesFiles);
         }
         else {
-          //alert('play anim');
           playAnimation(selectedAnimation);
         }
     });
@@ -886,155 +915,58 @@ function startExplosionAndAdjustCamera(skip = false) {
   }
   
   // #### MULTIPLE FORMATS ####
-  function handleModelLoading(file, mtlFile = null, animationsFiles = null, texturesFiles = null) {
-    const extension = file.split('.').pop();
-    loadAndGroupModels(file, extension, texturesFiles);
-    }
-
   // #### LOADERS ####
 
-  async function initializeOcct() {
-    if (!occtInitialized) {
-      occt = await occtimportjs({
-        locateFile: () => wasmUrl,
-      });
-      occtInitialized = true;
-    }
-  }
-  
-  async function LoadStep(fileUrl) {
-    await initializeOcct();
-    
-    const response = await fetch(fileUrl);
-    const buffer = await response.arrayBuffer();
-    const fileBuffer = new Uint8Array(buffer);
-  
-    const result = occt.ReadStepFile(fileBuffer);
-    const targetObject = new THREE.Object3D();
-  
-    for (const resultMesh of result.meshes) {
-      const geometry = new THREE.BufferGeometry();
-      const positionArray = new Float32Array(resultMesh.attributes.position.array);
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positionArray, 3));
-  
-      if (resultMesh.attributes.normal) {
-        const normalArray = new Float32Array(resultMesh.attributes.normal.array);
-        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normalArray, 3));
-      }
-  
-      const indexArray = new Uint16Array(resultMesh.index.array);
-      geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
-  
-      const color = resultMesh.color 
-        ? new THREE.Color(resultMesh.color[0], resultMesh.color[1], resultMesh.color[2])
-        : 0xcccccc;
-      
-      const material = new THREE.MeshPhongMaterial({ color });
-      const mesh = new THREE.Mesh(geometry, material);
-      targetObject.add(mesh);
-    }
-  
-    return targetObject;
-  }
+  async function loadGLTF(url) {
+    return new Promise((resolve, reject) => {
+        const loader = new THREE.GLTFLoader();
 
-  // Enhanced loadAndGroupModels function to handle texture assignment
-  async function loadAndGroupModels(file, fileType, textureUrlsS3) {
-      const group = new THREE.Group();
-      const urls = file.split(','); // Support multiple URLs if provided
-      const textureUrlsList = textureUrlsS3.split(',');
-      
-      for (let i = 0; i < urls.length; i++) {
-          const url = urls[i];
-          const textureUrls = textureUrlsList[i];  // Get corresponding textures for each model
-
-          try {
-              const model = await loadModel(url, fileType);
-
-              // Only convert to glTF if not already in glTF/glb format
-              const finalModel = (fileType === 'gltf' || fileType === 'glb')
-                  ? model  // If glTF, use the model directly
-                  : await convertToGLTF(model, fileType, url);  // Otherwise, convert to glTF
-
-              // Apply textures or base material to the model
-              applyMaterialToMeshModel(finalModel, textureUrlsList);
-
-              group.add(finalModel);
-          } catch (error) {
-              console.error(`Error loading model from ${url}:`, error);
+        loader.load(
+            url,
+            (gltf) => {
+                resolve(gltf.scene);
+            },
+            undefined,
+            (error) => {
+                reject(error);
             }
-      }
-
-      console.log("All models loaded, textures applied, and grouped.");
-
-      // Wrap the group into a ModelWrapper (custom implementation)
-      const modelWrapper = new ModelWrapper(group);
-      addModelToScene(modelWrapper);
-      return modelWrapper;
+        );
+    });
   }
 
-  // Function to load the model, apply material if necessary, and handle animations if glTF
-  async function loadModel(file, fileType) {
-      if (fileType === 'step' || fileType === 'stp') {
-        const mainObject = await LoadStep(file);
-        console.log('mainObject', mainObject);
-        return mainObject;
-      }
-      const loader = loaders[fileType.toLowerCase()];
-      if (!loader) throw new Error(`Unsupported file type: ${fileType}`);
-  
-      // For glTF/glb, load directly without conversion
-      if (fileType === 'gltf' || fileType === 'glb') {
-          const gltf = await loader.loadAsync(file);
-          
-          // If the model has animations, set up the AnimationMixer
-          if (gltf.animations && gltf.animations.length > 0) {
-              const mixer = new AnimationMixer(gltf.scene);
-              gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
-              gltf.scene.userData.mixer = mixer;  // Store mixer in model's userData
-          }
-          
-          return gltf.scene;  // Return the glTF scene directly
-      }
-  
-      // For other formats, load and convert to glTF if necessary
-      const model = await loader.loadAsync(file);
-      return (fileType === 'stp' || fileType === 'stp'|| fileType === 'stl' || fileType === 'ply')
-          ? applyBasicMaterial(model)
-          : model;
+  async function loadModel(file, mtlFile = null, animationsFiles = null, texturesFiles = null) {
+    const group = new THREE.Group();
+    const urls = file.split(',');
+    //const textureUrlsList = textureUrlsS3.split(',');
+
+    for (let i = 0; i < urls.length; i++) {
+        const url = urls[i];
+        //const textureUrls = textureUrlsList[i]; // Assuming you want to handle textures here
+        try {
+            const model = await loadGLTF(url);
+            group.add(model);
+            
+            // Example of applying textures (if needed)
+            // You can apply textures here based on textureUrls
+            // For example:
+            // applyTexturesToModel(model, textureUrls); // You'll need to define this function
+        } catch (error) {
+            console.error(`Error loading model from ${url}:`, error);
+        }
+    }
+
+    console.log("All models loaded and grouped.");
+    const modelWrapper = new ModelWrapper(group);
+    addModelToScene(modelWrapper); // Assuming this function adds the modelWrapper to the scene
   }
 
-  // Apply a basic material to geometry-based models (STL, PLY)
   function applyBasicMaterial(geometry) {
       const material = new MeshStandardMaterial({ color: 0xdddddd });
       return new Mesh(geometry, material);
   }
 
-  // Convert a loaded model to glTF for consistency
-  async function convertToGLTF(model, fileType, url) {
-      const exporter = new THREE.GLTFExporter();
-      return new Promise((resolve, reject) => {
-          exporter.parse(model, (gltfData) => {
-              console.log(`Converted ${fileType} model from ${url} to glTF format.`);
-              
-              // Create a Blob from the exported GLTF data
-              const json = JSON.stringify(gltfData);
-              const blob = new Blob([json], { type: 'application/json' });
-
-              // Load the GLTF data back into a Three.js scene
-              const loader = new THREE.GLTFLoader();
-              loader.load(URL.createObjectURL(blob), (gltf) => {
-                  resolve(gltf.scene);  // Return the loaded scene
-              }, undefined, (error) => {
-                  console.error(`Error loading GLTF from Blob:`, error);
-                  reject(error);
-              });
-          }, { binary: false });  // Change to true if you want a binary .glb
-      });
-  }
-
-
   // Add the model to the scene and configure necessary updates
-  function addModelToScene(modelWrapper) {
+  async function addModelToScene(modelWrapper) {
       const nullObject = scene.getObjectByName('nullObject');
       if (nullObject) {
           nullObject.add(modelWrapper.model);
@@ -1046,7 +978,7 @@ function startExplosionAndAdjustCamera(skip = false) {
       // Update focus, lighting, and bounding box based on the new model
       currentModel = modelWrapper;
       focusOnObject();
-      setLightPositions();
+      //setLightPositions();
       updateMinDistanceBasedOnBoundingBox();
       createDynamicDropdown(currentModel.model);
   }
