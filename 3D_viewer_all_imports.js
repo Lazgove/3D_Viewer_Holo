@@ -1,4 +1,4 @@
-<script>
+
 document.addEventListener('DOMContentLoaded', () => {
 
   // ######            ######
@@ -1304,4 +1304,4 @@ function stopLoading() {
   init3DViewer();
   });
 
-</script>
+
