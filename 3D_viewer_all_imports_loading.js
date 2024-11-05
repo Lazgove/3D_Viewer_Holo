@@ -842,6 +842,7 @@ function startExplosionAndAdjustCamera(skip = false) {
             option.text = `Animation ${index + 1}`;
             animationSelect.appendChild(option);
         });
+
     } else {
         animationSelect.style.display = 'none'; // Hide if no animations
     }
@@ -951,6 +952,28 @@ function startExplosionAndAdjustCamera(skip = false) {
       const urls = file.split(','); // Support multiple URLs if provided
       const textureUrlsList = textureUrlsS3.split(',');
 
+      // Hide the upload form
+      document.getElementById('3d-viewer').style.display = 'none';
+
+      loadingContainer.style.display = 'flex';
+
+      // Start the loading progress
+      progress = 0;
+      breakpoints = 0;
+      percentageText.textContent = `${progress}%`;
+      const offset = 283 - (progress / 100) * 283; // Calculate the stroke-dashoffset
+      progressCircle.style.strokeDashoffset = offset;
+      const dots = loadingContainer.querySelector('#dots');
+
+      function animateDots() {
+          let dotCount = 0;
+          setInterval(() => {
+              dotCount = (dotCount + 1) % 4; // Cycle through 0 to 3
+              dots.textContent = '.'.repeat(dotCount); // Update the dots based on count
+          }, 500); // Change dots every 500ms
+      }
+      animateDots(); // Start the dot animation
+
       const totalFiles = urls.length;
       breakpoints = 100/totalFiles;
       const initialBreakpoint = breakpoints;
@@ -972,7 +995,6 @@ function startExplosionAndAdjustCamera(skip = false) {
               applyMaterialToMeshModel(finalModel, textureUrlsList);
 
               group.add(finalModel);
-              stopLoading();
           } catch (error) {
               console.error(`Error loading model from ${url}:`, error);
             }
@@ -981,6 +1003,7 @@ function startExplosionAndAdjustCamera(skip = false) {
       console.log("All models loaded, textures applied, and grouped.");
 
       // Wrap the group into a ModelWrapper (custom implementation)
+      stopLoading();
       const modelWrapper = new ModelWrapper(group);
       addModelToScene(modelWrapper);
       return modelWrapper;
@@ -1274,7 +1297,7 @@ function startExplosionAndAdjustCamera(skip = false) {
 
 function stopLoading() {
     // Hide the upload form
-    document.getElementById('upload-form').style.display = 'block';
+    document.getElementById('3d-viewer').style.display = 'block';
     const loadingContainer = document.querySelector('.loading-container');
     loadingContainer.style.display = 'none';
     alert('All files have been uploaded successfully!');
