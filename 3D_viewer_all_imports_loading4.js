@@ -910,43 +910,56 @@ function startExplosionAndAdjustCamera(skip = false) {
   }
   
   async function LoadStep(fileUrl) {
-    const breakPointInit = breakpoints/4;
-
     await initializeOcct();
-    updateProgressTo(breakPointInit);
-    
+    const startTime = performance.now();
+
     const response = await fetch(fileUrl);
-    updateProgressTo(breakPointInit*2);
     const buffer = await response.arrayBuffer();
     const fileBuffer = new Uint8Array(buffer);
-    updateProgressTo(breakPointInit*3);
     const result = occt.ReadStepFile(fileBuffer);
     const targetObject = new THREE.Object3D();
-  
-    for (const resultMesh of result.meshes) {
-      const geometry = new THREE.BufferGeometry();
-      const positionArray = new Float32Array(resultMesh.attributes.position.array);
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positionArray, 3));
-  
-      if (resultMesh.attributes.normal) {
-        const normalArray = new Float32Array(resultMesh.attributes.normal.array);
-        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normalArray, 3));
-      }
-  
-      const indexArray = new Uint16Array(resultMesh.index.array);
-      geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
-  
-      const color = resultMesh.color 
-        ? new THREE.Color(resultMesh.color[0], resultMesh.color[1], resultMesh.color[2])
-        : 0xcccccc;
-      
-      const material = new THREE.MeshPhongMaterial({ color });
-      const mesh = new THREE.Mesh(geometry, material);
-      targetObject.add(mesh);
+    const instancedMeshes = {};
+
+    for (let i = 0; i < result.meshes.length; i++) {
+        const resultMesh = result.meshes[i];
+        const positionArray = new Float32Array(resultMesh.attributes.position.array);
+        const indexArray = new Uint16Array(resultMesh.index.array);
+
+        const geometryKey = `${positionArray.toString()}_${indexArray.toString()}`;
+        
+        if (!instancedMeshes[geometryKey]) {
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positionArray, 3));
+            geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
+
+            if (resultMesh.attributes.normal) {
+                const normalArray = new Float32Array(resultMesh.attributes.normal.array);
+                geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normalArray, 3));
+            }
+
+            const color = resultMesh.color
+                ? new THREE.Color(resultMesh.color[0], resultMesh.color[1], resultMesh.color[2])
+                : new THREE.Color(0xcccccc);
+            const material = new THREE.MeshPhongMaterial({ color });
+            
+            instancedMeshes[geometryKey] = new THREE.InstancedMesh(geometry, material, 0);
+            instancedMeshes[geometryKey].matrixAutoUpdate = true;
+            targetObject.add(instancedMeshes[geometryKey]);
+        }
+
+        const instanceMesh = instancedMeshes[geometryKey];
+        const instanceIndex = instanceMesh.count;
+
+        instanceMesh.setMatrixAt(instanceIndex, new THREE.Matrix4());
+        instanceMesh.count += 1;
     }
-    updateProgressTo(breakPointInit*4);
+
+    const endTime = performance.now();
+    console.log(`LoadStep executed in ${(endTime - startTime).toFixed(2)} milliseconds`);
+
     return targetObject;
-  }
+}
+
 
   // Enhanced loadAndGroupModels function to handle texture assignment
   async function loadAndGroupModels(file, fileType, textureUrlsS3) {
@@ -986,7 +999,9 @@ function startExplosionAndAdjustCamera(skip = false) {
 
           try {
               const model = await loadModel(url, fileType);
+              updateProgressTo(breakpoints);
               breakpoints += initialBreakpoint;
+              
               // Only convert to glTF if not already in glTF/glb format
             //   const finalModel = (fileType === 'gltf' || fileType === 'glb')
             //       ? model  // If glTF, use the model directly
