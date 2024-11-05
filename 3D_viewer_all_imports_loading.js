@@ -63,6 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let textMeshes = [];
   let occtInitialized = false;
   let occt;
+  let progress = 0;
+  let breakpoints = 0;
   const distanceScaleFactor = 3;
   const smoothFactor = 0.05;
 
