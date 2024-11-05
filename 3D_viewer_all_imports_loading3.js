@@ -21,6 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const cotationCheckbox = document.getElementById('cotationCheckbox');
   const blackModeCheckbox = document.getElementById('blackMode');
   const repereCheckbox = document.getElementById('repereCheckbox');
+  const loadingContainer = document.querySelector('.loading-container');
+  const progressCircle = loadingContainer.querySelector('circle:nth-of-type(2)');
+  const percentageText = loadingContainer.querySelector('.percentage');
 
   const textureLoader = new THREE.TextureLoader();
 
@@ -1300,7 +1303,6 @@ function stopLoading() {
     document.getElementById('3d-viewer').style.display = 'block';
     const loadingContainer = document.querySelector('.loading-container');
     loadingContainer.style.display = 'none';
-    alert('All files have been uploaded successfully!');
     progress = 0;
     //document.getElementById("progress-percentage").textContent = '0%'; // Reset the progress
   }
