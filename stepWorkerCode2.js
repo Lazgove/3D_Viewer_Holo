@@ -1,12 +1,12 @@
 self.onmessage = function(event) {
     // Access the data sent from the main thread
-    const { url, fileType } = event.data;
+    const { file, fileType } = event.data;
 
-    console.log('Received URL:', url);
+    console.log('Received URL:', file);
     console.log('Received File Type:', fileType);
 
     // Perform some task with the parameters
-    const result = `Processed ${fileType} from ${url}`;
+    const result = `Processed ${fileType} from ${file}`;
 
     // Send the result back to the main thread
     self.postMessage(result);
